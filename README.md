@@ -6,12 +6,6 @@
 
 ![image](https://github.com/user-attachments/assets/f8b82753-964e-4cea-937d-c342ede6e6d2)
 
-🔥 Giới thiệu
-
-   Dự án này xây dựng mô hình bãi đỗ xe thông minh sử dụng ESP32 và các cảm biến để xác định vị trí còn trống. Hệ thống có thể tự động mở/đóng cổng bằng RFID và servo, đồng thời kiểm tra xe bằng cảm biến hồng 
-
-ngoại, siêu âm, và trọng lượng. Kết quả được hiển thị trên LCD và có thể truy cập từ Web Server.
-
 🎯 Chức năng chính
 
    ✅ Xác định vị trí trống: Sử dụng cảm biến trọng lượng, cảm biến vật cản và cảm biến khoảng cách.
