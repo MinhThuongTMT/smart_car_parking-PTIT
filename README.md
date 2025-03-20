@@ -217,48 +217,96 @@ void checkWeightSensors() {
 📏 Đo khoảng cách bằng cảm biến HC-SR04
 
 float measureDistance() {
+    
     digitalWrite(TRIG_PIN, LOW);
+    
     delayMicroseconds(2);
+   
     digitalWrite(TRIG_PIN, HIGH);
+   
     delayMicroseconds(10);
+   
     digitalWrite(TRIG_PIN, LOW);
-    float duration = pulseIn(ECHO_PIN, HIGH);
-    return duration * 0.034 / 2;
+    
+    long duration = pulseIn(ECHO_PIN, HIGH);
+   
+    float distance = duration * 0.034 / 2; // Tính khoảng cách (cm)
+   
+    return distance;
 }
 🚦 Xác định xe và điều khiển LED
-cpp
-Sao chép
-Chỉnh sửa
+
 void checkForVehicle() {
-    if (digitalRead(IR_SENSOR_PIN) == LOW && measureDistance() >= 5 && measureDistance() <= 10) {
-        digitalWrite(LED_PIN, HIGH); 
-        Serial.println("Xe đã vào vị trí!");
-    } else {
-        digitalWrite(LED_PIN, LOW);
-    }
+  
+  int irState = digitalRead(IR_SENSOR_PIN); // Đọc trạng thái cảm biến hồng ngoại
+  
+  distance = measureDistance();             // Đo khoảng cách
+  
+  // Hiển thị thông tin lên terminal
+  
+  Serial.print("IR State: ");
+ 
+  Serial.println(irState == LOW ? "Có vật cản" : "Không có vật cản");
+ 
+  Serial.print("Khoảng cách: ");
+ 
+  Serial.print(distance);
+ 
+  Serial.println(" cm");
+  
+  // Kiểm tra điều kiện: Có vật cản và khoảng cách từ 4m đến 10m
+  
+  if (irState == LOW && distance >= 400 && distance <= 1000) {
+  
+    digitalWrite(LED_PIN, HIGH); // Bật LED
+ 
+    Serial.println("Phát hiện xe trong khoảng 4m - 7m! LED sáng.");
+ 
+  } else {
+   
+    digitalWrite(LED_PIN, LOW);  // Tắt LED
+   
+    Serial.println("Không phát hiện xe hoặc ngoài khoảng 4m - 7m. LED tắt.");
+  
+  }
+
 }
+
 🌐 Giao diện Web Server
+
 ESP32 cung cấp một giao diện Web để quản lý trạng thái bãi đỗ:
 
 Địa chỉ URL	Chức năng
+
 /	Trang chính hiển thị trạng thái bãi xe
+
 /log	Xem lịch sử xe vào/ra
+
 /open1	Mở cổng vào
+
 /close1	Đóng cổng vào
+
 /open2	Mở cổng ra
+
 /close2	Đóng cổng ra
+
 📷 Hình ảnh thực tế
+
 (Thêm ảnh mô hình thật của bạn ở đây!)
 
 🏆 Kết quả & Đánh giá
-✅ Hệ thống nhận diện vị trí trống chính xác ~95%.
+
+✅ Hệ thống nhận diện vị trí trống chính xác ...%.
+
 ✅ Giao diện web giúp giám sát dễ dàng từ xa.
+
 ✅ Cổng tự động mở/đóng ổn định và nhanh chóng.
+
 🔧 Cần cải thiện khả năng lọc nhiễu của cảm biến siêu âm.
-📜 License
-MIT License. Bạn có thể sử dụng và phát triển tiếp tục dự án này. 😊
+
 
 💡 Nếu bạn thích dự án này, hãy ⭐️ trên GitHub nhé!
-📩 Liên hệ: [Email của bạn] | 📌 Tác giả: [Tên của bạn]
 
-🚀 Chúc bạn lập trình vui vẻ! 🚀
+📩 Liên hệ: tranminhthuong08082003@gmail.com | 📌 Tác giả: Nhom 1 - PTIT
+
+🚀 Nhom 1 - PTIT! 🚀
