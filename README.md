@@ -234,7 +234,7 @@ void checkForVehicle() {
 
 ```
 
-🌐 Giao diện Web Server
+### 🌐 Giao diện Web Server
 
 ESP32 cung cấp một giao diện Web để quản lý trạng thái bãi đỗ:
 
@@ -248,11 +248,11 @@ ESP32 cung cấp một giao diện Web để quản lý trạng thái bãi đỗ
 
 📊 Cập nhật dữ liệu: Dữ liệu cảm biến và trạng thái bãi xe được cập nhật liên tục
 
-📷 Hình ảnh thực tế
+### 📷 Hình ảnh thực tế
 
 (Thêm ảnh mô hình thật của bạn ở đây!)
 
-🏆 Kết quả & Đánh giá
+### 🏆 Kết quả & Đánh giá
 
 ✅ Hệ thống nhận diện vị trí trống chính xác ...%.
 
