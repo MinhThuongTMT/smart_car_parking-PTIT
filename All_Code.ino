@@ -10,70 +10,114 @@
 #include <TimeLib.h>
 #include <NTPClient.h>
 #include <WiFiUdp.h>
+#include "HX711.h"
 
-#define SS_PIN_1 5
-#define RST_PIN_1 2
-#define SS_PIN_2 15
-#define RST_PIN_2 13
-#define SERVO_PIN_4 4
-#define SERVO_PIN_16 16
+// RFID1
+#define SS_PIN_1 5      // Chân SS cho RFID 1 (Cổng vào) == SDA
+#define RST_PIN_1 2     // Chân RST cho RFID 1
+// RFID2
+#define SS_PIN_2 15     // Chân SS cho RFID 2 (Cổng ra) == SDA
+#define RST_PIN_2 13    // Chân RST cho RFID 2
+// SERVO
+#define SERVO_PIN_4 4   // Chân servo cổng 1
+#define SERVO_PIN_16 16 // Chân servo cổng 2
+// LOADCELL
+#define LOADCELL_DOUT_PIN 32  // Chân DATA của HX711 thứ nhất
+#define LOADCELL_SCK_PIN 33   // Chân SCK của HX711 thứ nhất
+#define LOADCELL_DOUT_PIN_2 26 // Chân DATA của HX711 thứ hai
+#define LOADCELL_SCK_PIN_2 27  // Chân SCK của HX711 thứ hai
+// Cảm biến vật cản hồng ngoại
+#define IR_SENSOR_PIN 35
+// Cảm biến khoảng cách Ultrasonic
+#define TRIG_PIN 17
+#define ECHO_PIN 14
+// LED
+#define LED_PIN 25  
+
+// Khai báo đối tượng
+HX711 scale;       // Cảm biến trọng lượng 1
+HX711 scale2;      // Cảm biến trọng lượng 2
+float calibration_factor = 417.5; // Hệ số hiệu chuẩn
 
 // Khai báo biến NTP
 WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", 7 * 3600, 60000); // GMT+7, cập nhật mỗi phút
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 7 * 3600, 60000); // GMT+7
 
-MFRC522 rfid1(SS_PIN_1, RST_PIN_1);
-MFRC522 rfid2(SS_PIN_2, RST_PIN_2);
+MFRC522 rfid1(SS_PIN_1, RST_PIN_1); // Module RFID cổng vào
+MFRC522 rfid2(SS_PIN_2, RST_PIN_2); // Module RFID cổng ra
 MFRC522::MIFARE_Key key;
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-Servo servo4;
-Servo servo16;
+Servo servo4;   // Servo cổng 1
+Servo servo16;  // Servo cổng 2
 
 WebServer server(80);
 String logData = "";
 
+// Biến theo dõi trạng thái
+int availableSpots = 4;  // Số vị trí còn trống ban đầu
+bool wasOccupied1 = false; // Trạng thái trước đó của cảm biến 1
+bool wasOccupied2 = false; // Trạng thái trước đó của cảm biến 2
+
+// Biến để lưu khoảng cách
+float distance;
+
+// Khai báo các hàm
 void initializeSystem();
-void handleRFID(MFRC522 &rfid, Servo &servo, String gateName);
+void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action);
 void displayMessage(const char *message);
 void moveServo(Servo &servo, int position, int delayTime);
 void handleRoot();
+void handleLog();
 void openGate1();
 void closeGate1();
 void openGate2();
 void closeGate2();
 String getTimeStamp();
+void updateLCD();
+void checkWeightSensors();
+float measureDistance();  // Hàm đo khoảng cách
+void checkForVehicle();   // Hàm kiểm tra xe và điều khiển LED
 
 void setup() {
     Serial.begin(115200);
-    server.on("/log", handleLog);
     lcd.begin();
     lcd.backlight();
     displayMessage("Starting...");
     delay(1000);
-    
-    
+
+    // Kết nối WiFi
     WiFiManager wifiManager;
     displayMessage("Connecting WiFi...");
     Serial.println("Connecting to WiFi...");
-    
     if (!wifiManager.autoConnect("ESP32-TMT")) {
         Serial.println("Failed to connect. Restarting...");
         displayMessage("WiFi Failed!");
         delay(2000);
         ESP.restart();
     }
-    
     Serial.println("WiFi Connected");
     displayMessage("WiFi Connected!");
-    delay(2000);
 
+    // Lấy và hiển thị địa chỉ IP
+    String ip = WiFi.localIP().toString();
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("IP Address:");
+    lcd.setCursor(0, 1);
+    lcd.print(ip);
+    delay(5000); // Hiển thị trong 5 giây
 
-    timeClient.begin();  // Khởi động NTP
-    timeClient.update(); // Lấy thời gian ban đầu
+    // Khởi động NTP
+    timeClient.begin();
+    timeClient.update();
 
+    // Khởi tạo hệ thống
     initializeSystem();
+
+    // Cấu hình WebServer
     server.on("/", handleRoot);
+    server.on("/log", handleLog);
     server.on("/open1", openGate1);
     server.on("/close1", closeGate1);
     server.on("/open2", openGate2);
@@ -81,31 +125,58 @@ void setup() {
     server.begin();
     Serial.println("WebServer Started.");
     displayMessage("System Ready");
+
+    // Khởi tạo cảm biến trọng lượng 1
+    scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+    Serial.println("Đang hiệu chuẩn cân thứ nhất...");
+    scale.tare();
+    delay(1000);
+    scale.set_scale(calibration_factor);
+    Serial.println("Hiệu chuẩn cảm biến thứ nhất hoàn tất!");
+
+    // Khởi tạo cảm biến trọng lượng 2
+    scale2.begin(LOADCELL_DOUT_PIN_2, LOADCELL_SCK_PIN_2);
+    Serial.println("Đang hiệu chuẩn cân thứ hai...");
+    scale2.tare();
+    delay(1000);
+    scale2.set_scale(calibration_factor);
+    Serial.println("Hiệu chuẩn cảm biến thứ hai hoàn tất!");
+    Serial.println("Cả hai cân đã sẵn sàng để đo!");
+
+    // Cấu hình các chân cảm biến và LED
+    pinMode(IR_SENSOR_PIN, INPUT);  // Cảm biến hồng ngoại
+    pinMode(TRIG_PIN, OUTPUT);      // TRIG của Ultrasonic
+    pinMode(ECHO_PIN, INPUT);       // ECHO của Ultrasonic
+    pinMode(LED_PIN, OUTPUT);       // LED
+
+    updateLCD(); // Hiển thị số vị trí còn trống ban đầu
 }
 
 void loop() {
     server.handleClient();
-
-    // Kiểm tra và xử lý quẹt thẻ RFID
-    handleRFID(rfid1, servo4, "Cổng vào", "Xe vào");  // Web hiển thị: Xe vào
-    handleRFID(rfid2, servo16, "Cổng ra", "Xe ra");   // Web hiển thị: Xe ra
-
     timeClient.update();
-}
 
+    // Gọi các hàm xử lý
+    handleRFID(rfid1, servo4, "Cổng vào", "Xe vào");
+    handleRFID(rfid2, servo16, "Cổng ra", "Xe ra");
+    checkWeightSensors();
+    checkForVehicle(); // Kiểm tra xe và điều khiển LED
+
+    delay(500); // Giảm tần suất lặp để tránh nhiễu
+}
 
 void initializeSystem() {
     SPI.begin();
     rfid1.PCD_Init();
     rfid2.PCD_Init();
-    
+
     servo4.attach(SERVO_PIN_4);
     servo16.attach(SERVO_PIN_16);
-    
+
     for (byte i = 0; i < 6; i++) {
-        key.keyByte[i] = 0xFF;
+        key.keyByte[i] = 0xFF; // Khóa mặc định cho MFRC522
     }
-    
+
     Serial.println("RFID System Initialized.");
     displayMessage("RFID Ready");
 }
@@ -115,19 +186,15 @@ void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action) {
         Serial.println("RFID Detected at " + gateName);
         String entryTime = getTimeStamp();
 
-        // Cập nhật log cho WebServer
+        // Cập nhật log
         logData += "<tr><td>" + gateName + "</td><td>" + action + "</td><td>" + entryTime + "</td></tr>";
 
-        // Hiển thị trên LCD: MỞ CỔNG
-        displayMessage("-- OPEN --");
-
         // Mở cổng
+        displayMessage("-- OPEN --");
         moveServo(servo, 90, 5000);
 
         // Đóng cổng
         moveServo(servo, 0, 0);
-
-        // Hiển thị trên LCD: ĐÓNG CỔNG
         displayMessage("-- CLOSE --");
 
         // Dừng thẻ RFID
@@ -135,7 +202,6 @@ void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action) {
         rfid.PCD_StopCrypto1();
     }
 }
-
 
 void displayMessage(const char *message) {
     lcd.clear();
@@ -149,6 +215,101 @@ void moveServo(Servo &servo, int position, int delayTime) {
     if (delayTime > 0) {
         delay(delayTime);
     }
+}
+
+void updateLCD() {
+    char buffer[16];
+    sprintf(buffer, "Spots: %d", availableSpots);
+    displayMessage(buffer);
+}
+
+void checkWeightSensors() {
+    // Cảm biến 1
+    if (scale.is_ready()) {
+        float weight1 = scale.get_units(10); // Trung bình 10 lần đo
+        if (abs(weight1) < 2) weight1 = 0; // Ngưỡng nhiễu
+
+        Serial.print("Khối lượng cảm biến 1: ");
+        Serial.print(weight1);
+        Serial.println(" g");
+
+        bool isOccupied1 = weight1 > 10;
+        if (isOccupied1 && !wasOccupied1) {
+            if (availableSpots > 0) {
+                availableSpots--;
+                updateLCD();
+            }
+        } else if (!isOccupied1 && wasOccupied1) {
+            if (availableSpots < 4) {
+                availableSpots++;
+                updateLCD();
+            }
+        }
+        wasOccupied1 = isOccupied1;
+    } else {
+        Serial.println("Cảm biến 1 chưa sẵn sàng!");
+    }
+
+    // Cảm biến 2
+    if (scale2.is_ready()) {
+        float weight2 = scale2.get_units(10);
+        if (abs(weight2) < 2) weight2 = 0;
+
+        Serial.print("Khối lượng cảm biến 2: ");
+        Serial.print(weight2);
+        Serial.println(" g");
+
+        bool isOccupied2 = weight2 > 8;
+        if (isOccupied2 && !wasOccupied2) {
+            if (availableSpots > 0) {
+                availableSpots--;
+                updateLCD();
+            }
+        } else if (!isOccupied2 && wasOccupied2) {
+            if (availableSpots < 4) {
+                availableSpots++;
+                updateLCD();
+            }
+        }
+        wasOccupied2 = isOccupied2;
+    } else {
+        Serial.println("Cảm biến 2 chưa sẵn sàng!");
+    }
+}
+
+// Hàm đo khoảng cách từ cảm biến Ultrasonic
+float measureDistance() {
+    digitalWrite(TRIG_PIN, LOW);
+    delayMicroseconds(2);
+    digitalWrite(TRIG_PIN, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(TRIG_PIN, LOW);
+    
+    long duration = pulseIn(ECHO_PIN, HIGH);
+    float distance = duration * 0.034 / 2; // Tính khoảng cách (cm)
+    return distance;
+}
+
+// Hàm kiểm tra xe và điều khiển LED
+void checkForVehicle() {
+  int irState = digitalRead(IR_SENSOR_PIN); // Đọc trạng thái cảm biến hồng ngoại
+  distance = measureDistance();             // Đo khoảng cách
+  
+  // Hiển thị thông tin lên terminal
+  Serial.print("IR State: ");
+  Serial.println(irState == LOW ? "Có vật cản" : "Không có vật cản");
+  Serial.print("Khoảng cách: ");
+  Serial.print(distance);
+  Serial.println(" cm");
+  
+  // Kiểm tra điều kiện: Có vật cản và khoảng cách từ 4m đến 10m
+  if (irState == LOW && distance >= 400 && distance <= 1000) {
+    digitalWrite(LED_PIN, HIGH); // Bật LED
+    Serial.println("Phát hiện xe trong khoảng 4m - 7m! LED sáng.");
+  } else {
+    digitalWrite(LED_PIN, LOW);  // Tắt LED
+    Serial.println("Không phát hiện xe hoặc ngoài khoảng 4m - 7m. LED tắt.");
+  }
 }
 
 void handleRoot() {
@@ -270,8 +431,6 @@ void handleRoot() {
     server.send(200, "text/html", html);
 }
 
-
-
 void handleLog() {
     server.send(200, "text/html", logData);
 }
@@ -279,26 +438,26 @@ void handleLog() {
 void openGate1() {
     moveServo(servo4, 90, 5000);
     moveServo(servo4, 0, 0);
-    logData += "Gate 1 Opened - " + getTimeStamp() + "<br>";
+    logData += "<tr><td>Cổng vào</td><td>Xe vào</td><td>" + getTimeStamp() + "</td></tr>";
     server.send(200, "text/plain", "Gate 1 Opened");
 }
 
 void closeGate1() {
     moveServo(servo4, 0, 0);
-    logData += "Gate 1 Closed - " + getTimeStamp() + "<br>";
+    logData += "<tr><td>Cổng vào</td><td>Đóng cổng</td><td>" + getTimeStamp() + "</td></tr>";
     server.send(200, "text/plain", "Gate 1 Closed");
 }
 
 void openGate2() {
     moveServo(servo16, 90, 5000);
     moveServo(servo16, 0, 0);
-    logData += "Gate 2 Opened - " + getTimeStamp() + "<br>";
+    logData += "<tr><td>Cổng ra</td><td>Xe ra</td><td>" + getTimeStamp() + "</td></tr>";
     server.send(200, "text/plain", "Gate 2 Opened");
 }
 
 void closeGate2() {
     moveServo(servo16, 0, 0);
-    logData += "Gate 2 Closed - " + getTimeStamp() + "<br>";
+    logData += "<tr><td>Cổng ra</td><td>Đóng cổng</td><td>" + getTimeStamp() + "</td></tr>";
     server.send(200, "text/plain", "Gate 2 Closed");
 }
 
@@ -312,4 +471,3 @@ String getTimeStamp() {
     strftime(buffer, sizeof(buffer), "%H:%M:%S - %d/%m/%Y", timeInfo);
     return String(buffer);
 }
-
