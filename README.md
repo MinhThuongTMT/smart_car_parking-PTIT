@@ -55,17 +55,17 @@ ngoại, siêu âm, và trọng lượng. Kết quả được hiển thị trê
 
 Mở Arduino IDE, vào Library Manager, tìm và cài đặt các thư viện sau:
 
-WiFiManager
+📶 WiFiManager - Quản lý kết nối WiFi cho ESP32
 
-MFRC522
+🎫 MFRC522 - Thư viện đọc thẻ RFID
 
-ESP32Servo
+⚙ ESP32Servo - Điều khiển servo với ESP32
 
-NTPClient
+⏳ NTPClient - Đồng bộ thời gian từ NTP Server
 
-HX711
+⚖ HX711 - Đọc giá trị từ cảm biến trọng lượng
 
-LiquidCrystal_I2C
+📟 LiquidCrystal_I2C - Điều khiển LCD qua giao tiếp I2C
 
 2️⃣ Kết nối phần cứng
 
@@ -312,6 +312,7 @@ ESP32 cung cấp một giao diện Web để quản lý trạng thái bãi đỗ
 
 💡 Nếu bạn thích dự án này, hãy ⭐️ trên GitHub nhé!
 
-📩 Liên hệ: tranminhthuong08082003@gmail.com | 📌 Tác giả: Nhom 1 - PTIT
+📩 Liên hệ: tranminhthuong08082003@gmail.com | 
 
-🚀 Nhom 1 - PTIT! 🚀
+📌 Tác giả: 🚀 Nhom 1 - PTIT! 🚀
+
