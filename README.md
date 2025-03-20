@@ -2,7 +2,7 @@
 
 📌 Giới thiệu
 
-Dự án này xây dựng mô hình bãi đỗ xe thông minh sử dụng ESP32 và các cảm biến để xác định vị trí còn trống. Hệ thống có thể tự động mở/đóng cổng bằng RFID và servo, đồng thời kiểm tra xe bằng cảm biến hồng 
+   Dự án này xây dựng mô hình bãi đỗ xe thông minh sử dụng ESP32 và các cảm biến để xác định vị trí còn trống. Hệ thống có thể tự động mở/đóng cổng bằng RFID và servo, đồng thời kiểm tra xe bằng cảm biến hồng 
 
 ngoại, siêu âm, và trọng lượng. Kết quả được hiển thị trên LCD và có thể truy cập từ Web Server.
 
@@ -10,39 +10,39 @@ ngoại, siêu âm, và trọng lượng. Kết quả được hiển thị trê
 
 🔥 Giới thiệu
 
-Dự án này xây dựng mô hình bãi đỗ xe thông minh sử dụng ESP32 và các cảm biến để xác định vị trí còn trống. Hệ thống có thể tự động mở/đóng cổng bằng RFID và servo, đồng thời kiểm tra xe bằng cảm biến hồng 
+   Dự án này xây dựng mô hình bãi đỗ xe thông minh sử dụng ESP32 và các cảm biến để xác định vị trí còn trống. Hệ thống có thể tự động mở/đóng cổng bằng RFID và servo, đồng thời kiểm tra xe bằng cảm biến hồng 
 
 ngoại, siêu âm, và trọng lượng. Kết quả được hiển thị trên LCD và có thể truy cập từ Web Server.
 
 🎯 Chức năng chính
 
-✅ Xác định vị trí trống: Sử dụng cảm biến trọng lượng, cảm biến vật cản và cảm biến khoảng cách.
+   ✅ Xác định vị trí trống: Sử dụng cảm biến trọng lượng, cảm biến vật cản và cảm biến khoảng cách.
 
-✅ Tự động mở/đóng cổng: Dùng RFID quét thẻ để vào/ra, điều khiển servo.
+   ✅ Tự động mở/đóng cổng: Dùng RFID quét thẻ để vào/ra, điều khiển servo.
 
-✅ Hiển thị thông tin: Trên màn hình LCD và giao diện WebServer.
+   ✅ Hiển thị thông tin: Trên màn hình LCD và giao diện WebServer.
 
-✅ Cập nhật thời gian thực: Đồng bộ với NTP Server để hiển thị thời gian chính xác.
+   ✅ Cập nhật thời gian thực: Đồng bộ với NTP Server để hiển thị thời gian chính xác.
 
-✅ Hệ thống quản lý từ xa: Điều khiển trạng thái cổng và xem log từ trình duyệt.
+   ✅ Hệ thống quản lý từ xa: Điều khiển trạng thái cổng và xem log từ trình duyệt.
 
 🔧 Phần cứng sử dụng
 
-🖥 ESP32 - Bộ điều khiển chính
+   🖥 ESP32 - Bộ điều khiển chính
 
-📡 RFID RC522 (x2) - Nhận diện thẻ mở cổng
+  📡 RFID RC522 (x2) - Nhận diện thẻ mở cổng
 
-⚖ Cảm biến trọng lượng HX711 (x2) - Xác định xe có đỗ hay không
+  ⚖ Cảm biến trọng lượng HX711 (x2) - Xác định xe có đỗ hay không
 
-🚦 Cảm biến vật cản hồng ngoại - Kiểm tra có vật cản không
+  🚦 Cảm biến vật cản hồng ngoại - Kiểm tra có vật cản không
 
-📏 Cảm biến khoảng cách HC-SR04 - Định vị xe trong phạm vi 5-10m
+  📏 Cảm biến khoảng cách HC-SR04 - Định vị xe trong phạm vi 5-10m
 
-🔄 Servo (x2) - Điều khiển mở/đóng cổng
+  🔄 Servo (x2) - Điều khiển mở/đóng cổng
 
-📟 LCD 16x2 I2C - Hiển thị thông tin trạng thái
+  📟 LCD 16x2 I2C - Hiển thị thông tin trạng thái
 
-💡 LED - Báo hiệu trạng thái bãi đỗ
+  💡 LED - Báo hiệu trạng thái bãi đỗ
 
 📜 Sơ đồ kết nối
 
@@ -55,77 +55,70 @@ ngoại, siêu âm, và trọng lượng. Kết quả được hiển thị trê
 
 Mở Arduino IDE, vào Library Manager, tìm và cài đặt các thư viện sau:
 
-📶 WiFiManager - Quản lý kết nối WiFi cho ESP32
+  📶 WiFiManager - Quản lý kết nối WiFi cho ESP32
 
-🎫 MFRC522 - Thư viện đọc thẻ RFID
+  🎫 MFRC522 - Thư viện đọc thẻ RFID
 
-⚙ ESP32Servo - Điều khiển servo với ESP32
+  ⚙ ESP32Servo - Điều khiển servo với ESP32
 
-⏳ NTPClient - Đồng bộ thời gian từ NTP Server
+  ⏳ NTPClient - Đồng bộ thời gian từ NTP Server
 
-⚖ HX711 - Đọc giá trị từ cảm biến trọng lượng
+  ⚖ HX711 - Đọc giá trị từ cảm biến trọng lượng
 
-📟 LiquidCrystal_I2C - Điều khiển LCD qua giao tiếp I2C
+  📟 LiquidCrystal_I2C - Điều khiển LCD qua giao tiếp I2C
 
 2️⃣ Kết nối phần cứng
 
-🔌 Kết nối ESP32 với các cảm biến theo sơ đồ trên.
+  🔌 Kết nối ESP32 với các cảm biến theo sơ đồ trên.
 
-⚡ Cấp nguồn cho mạch.
+  ⚡ Cấp nguồn cho mạch.
 
 3️⃣ Nạp chương trình
 
-📂 Mở file .ino trên Arduino IDE.
+  📂 Mở file .ino trên Arduino IDE.
 
-🔧 Chọn board ESP32 Dev Module.
+  🔧 Chọn board ESP32 Dev Module.
 
-🔌 Chọn cổng COM phù hợp và Upload chương trình.
+  🔌 Chọn cổng COM phù hợp và Upload chương trình.
 
 4️⃣ Kết nối WiFi
 
-📶 Khi ESP32 khởi động, nó sẽ tạo một WiFi AP có tên "ESP32-TMT".
+  📶 Khi ESP32 khởi động, nó sẽ tạo một WiFi AP có tên "ESP32-TMT".
 
-📱 Kết nối điện thoại/laptop với WiFi này.
+  📱 Kết nối điện thoại/laptop với WiFi này.
 
-🌍 Truy cập 192.168.4.1 để thiết lập WiFi.
+  🌍 Truy cập 192.168.4.1 để thiết lập WiFi.
 
 5️⃣ Sử dụng hệ thống
 
-🎫 Quét thẻ RFID để mở cổng 🚗
+  🎫 Quét thẻ RFID để mở cổng 🚗
 
-📟 Kiểm tra vị trí trống trên LCD
+  📟 Kiểm tra vị trí trống trên LCD
 
-💻 Truy cập http://[IP-ESP32] để quản lý bãi đỗ trên Web
+  💻 Truy cập http://[IP-ESP32] để quản lý bãi đỗ trên Web
 
 📜 Các hàm quan trọng
 
-🎫 Xử lý RFID quét thẻ
+### 🎫 Xử lý RFID quét thẻ  
 
-void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action) {
-    
-    if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
+```cpp
+void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action) {  
+    if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {  
+        Serial.println("RFID Detected at " + gateName);  
         
-        Serial.println("RFID Detected at " + gateName);
-        
-        String entryTime = getTimeStamp();
+        String entryTime = getTimeStamp();  
+        logData += "<tr><td>" + gateName + "</td><td>" + action + "</td><td>" + entryTime + "</td></tr>";  
 
-        logData += "<tr><td>" + gateName + "</td><td>" + action + "</td><td>" + entryTime + "</td></tr>";
+        displayMessage("-- OPEN --");  
+        moveServo(servo, 90, 5000);  
+        moveServo(servo, 0, 0);  
+        displayMessage("-- CLOSE --");  
 
-        displayMessage("-- OPEN --");
-        
-        moveServo(servo, 90, 5000);
-
-        moveServo(servo, 0, 0);
-        
-        displayMessage("-- CLOSE --");
-
-        rfid.PICC_HaltA();
-       
-        rfid.PCD_StopCrypto1();
-    
-    }
-
+        rfid.PICC_HaltA();  
+        rfid.PCD_StopCrypto1();  
+    }  
 }
+
 
 ⚖️ Kiểm tra cảm biến trọng lượng
 
