@@ -118,106 +118,69 @@ void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action) {
         rfid.PCD_StopCrypto1();  
     }  
 }
+```
 
+### ⚖️ Kiểm tra cảm biến trọng lượng  
 
-⚖️ Kiểm tra cảm biến trọng lượng
+```cpp
+void checkWeightSensors() {  
+    // Cảm biến 1  
+    if (scale.is_ready()) {  
+        float weight1 = scale.get_units(10); // Trung bình 10 lần đo  
+        if (abs(weight1) < 2) weight1 = 0; // Ngưỡng nhiễu  
 
-void checkWeightSensors() {
-    
-    // Cảm biến 1
-    
-    if (scale.is_ready()) {
-        
-        float weight1 = scale.get_units(10); // Trung bình 10 lần đo
-        
-        if (abs(weight1) < 2) weight1 = 0; // Ngưỡng nhiễu
-  
-        Serial.print("Khối lượng cảm biến 1: ");
-        
-        Serial.print(weight1);
-       
-        Serial.println(" g");
+        Serial.print("Khối lượng cảm biến 1: ");  
+        Serial.print(weight1);  
+        Serial.println(" g");  
 
-        bool isOccupied1 = weight1 > 10;
-        
-        if (isOccupied1 && !wasOccupied1) {
-           
-            if (availableSpots > 0) {
-              
-                availableSpots--;
-               
-                updateLCD();
-            
-            }
-        
-        } else if (!isOccupied1 && wasOccupied1) {
-            
-            if (availableSpots < 4) {
-                
-                availableSpots++;
-               
-                updateLCD();
-           
-            }
-        
-        }
-      
-        wasOccupied1 = isOccupied1;
-    
-    } else {
-       
-        Serial.println("Cảm biến 1 chưa sẵn sàng!");
-   
-    }
+        bool isOccupied1 = weight1 > 10;  
+        if (isOccupied1 && !wasOccupied1) {  
+            if (availableSpots > 0) {  
+                availableSpots--;  
+                updateLCD();  
+            }  
+        } else if (!isOccupied1 && wasOccupied1) {  
+            if (availableSpots < 4) {  
+                availableSpots++;  
+                updateLCD();  
+            }  
+        }  
+        wasOccupied1 = isOccupied1;  
+    } else {  
+        Serial.println("Cảm biến 1 chưa sẵn sàng!");  
+    }  
 
-    // Cảm biến 2
-   
-    if (scale2.is_ready()) {
-       
-        float weight2 = scale2.get_units(10);
-       
-        if (abs(weight2) < 2) weight2 = 0;
+    // Cảm biến 2  
+    if (scale2.is_ready()) {  
+        float weight2 = scale2.get_units(10);  
+        if (abs(weight2) < 2) weight2 = 0;  
 
-        Serial.print("Khối lượng cảm biến 2: ");
-        
-        Serial.print(weight2);
-        
-        Serial.println(" g");
+        Serial.print("Khối lượng cảm biến 2: ");  
+        Serial.print(weight2);  
+        Serial.println(" g");  
 
-        bool isOccupied2 = weight2 > 8;
-       
-        if (isOccupied2 && !wasOccupied2) {
-         
-            if (availableSpots > 0) {
-           
-                availableSpots--;
-           
-                updateLCD();
-          
-            }
-        
-        } else if (!isOccupied2 && wasOccupied2) {
-           
-            if (availableSpots < 4) {
-             
-                availableSpots++;
-            
-                updateLCD();
-           
-            }
-
-        }
-      
-        wasOccupied2 = isOccupied2;
-    
-    } else {
-      
-        Serial.println("Cảm biến 2 chưa sẵn sàng!");
-   
-    }
+        bool isOccupied2 = weight2 > 8;  
+        if (isOccupied2 && !wasOccupied2) {  
+            if (availableSpots > 0) {  
+                availableSpots--;  
+                updateLCD();  
+            }  
+        } else if (!isOccupied2 && wasOccupied2) {  
+            if (availableSpots < 4) {  
+                availableSpots++;  
+                updateLCD();  
+            }  
+        }  
+        wasOccupied2 = isOccupied2;  
+    } else {  
+        Serial.println("Cảm biến 2 chưa sẵn sàng!");  
+    }  
 }
+```
 
-📏 Đo khoảng cách bằng cảm biến HC-SR04
+### 📏 Đo khoảng cách bằng cảm biến HC-SR04
+
+```cpp
 
 float measureDistance() {
     
@@ -238,7 +201,11 @@ float measureDistance() {
     return distance;
 }
 
-🚦 Xác định xe và điều khiển LED
+```
+
+###🚦 Xác định xe và điều khiển LED
+
+```cpp
 
 void checkForVehicle() {
   
@@ -273,6 +240,8 @@ void checkForVehicle() {
   }
 
 }
+
+```
 
 🌐 Giao diện Web Server
 
