@@ -1,8 +1,12 @@
 🚗 SMART CAR PARKING PTIT 🚗
 
-📌 Xác định vị trí trống trong bãi đỗ xe sử dụng ESP32 và các cảm biến
-![image](https://github.com/user-attachments/assets/f8b82753-964e-4cea-937d-c342ede6e6d2)
+📌 Giới thiệu
 
+Dự án này xây dựng mô hình bãi đỗ xe thông minh sử dụng ESP32 và các cảm biến để xác định vị trí còn trống. Hệ thống có thể tự động mở/đóng cổng bằng RFID và servo, đồng thời kiểm tra xe bằng cảm biến hồng 
+
+ngoại, siêu âm, và trọng lượng. Kết quả được hiển thị trên LCD và có thể truy cập từ Web Server.
+
+![image](https://github.com/user-attachments/assets/f8b82753-964e-4cea-937d-c342ede6e6d2)
 
 🔥 Giới thiệu
 
@@ -24,15 +28,21 @@ ngoại, siêu âm, và trọng lượng. Kết quả được hiển thị trê
 
 🔧 Phần cứng sử dụng
 
-Linh kiện	Chức năng
-ESP32	Bộ điều khiển chính
-RFID RC522 (x2)	Nhận diện thẻ mở cổng
-Cảm biến trọng lượng HX711 (x2)	Xác định xe có đỗ hay không
-Cảm biến vật cản hồng ngoại	Kiểm tra có vật cản không
-Cảm biến khoảng cách HC-SR04	Định vị xe trong phạm vi 5-10m
-Servo (x2)	Điều khiển mở/đóng cổng
-LCD 16x2 I2C	Hiển thị thông tin trạng thái
-LED	Báo hiệu trạng thái bãi đỗ
+🖥 ESP32 - Bộ điều khiển chính
+
+📡 RFID RC522 (x2) - Nhận diện thẻ mở cổng
+
+⚖ Cảm biến trọng lượng HX711 (x2) - Xác định xe có đỗ hay không
+
+🚦 Cảm biến vật cản hồng ngoại - Kiểm tra có vật cản không
+
+📏 Cảm biến khoảng cách HC-SR04 - Định vị xe trong phạm vi 5-10m
+
+🔄 Servo (x2) - Điều khiển mở/đóng cổng
+
+📟 LCD 16x2 I2C - Hiển thị thông tin trạng thái
+
+💡 LED - Báo hiệu trạng thái bãi đỗ
 
 📜 Sơ đồ kết nối
 
@@ -45,47 +55,47 @@ LED	Báo hiệu trạng thái bãi đỗ
 
 Mở Arduino IDE, vào Library Manager, tìm và cài đặt các thư viện sau:
 
-- WiFiManager
+WiFiManager
 
-- MFRC522
+MFRC522
 
-- ESP32Servo
+ESP32Servo
 
-- NTPClient
+NTPClient
 
-- HX711
+HX711
 
-- LiquidCrystal_I2C
+LiquidCrystal_I2C
 
 2️⃣ Kết nối phần cứng
 
-Kết nối ESP32 với các cảm biến theo sơ đồ trên.
+🔌 Kết nối ESP32 với các cảm biến theo sơ đồ trên.
 
-Cấp nguồn cho mạch.
+⚡ Cấp nguồn cho mạch.
 
 3️⃣ Nạp chương trình
 
-Mở file .ino trên Arduino IDE.
+📂 Mở file .ino trên Arduino IDE.
 
-Chọn board ESP32 Dev Module.
+🔧 Chọn board ESP32 Dev Module.
 
-Chọn cổng COM phù hợp và Upload chương trình.
+🔌 Chọn cổng COM phù hợp và Upload chương trình.
 
 4️⃣ Kết nối WiFi
 
-Khi ESP32 khởi động, nó sẽ tạo một WiFi AP có tên "ESP32-TMT".
+📶 Khi ESP32 khởi động, nó sẽ tạo một WiFi AP có tên "ESP32-TMT".
 
-Kết nối điện thoại/laptop với WiFi này.
+📱 Kết nối điện thoại/laptop với WiFi này.
 
-Truy cập 192.168.4.1 để thiết lập WiFi.
+🌍 Truy cập 192.168.4.1 để thiết lập WiFi.
 
 5️⃣ Sử dụng hệ thống
 
-Quét thẻ RFID để mở cổng 🚗
+🎫 Quét thẻ RFID để mở cổng 🚗
 
-Kiểm tra vị trí trống trên LCD 📟
+📟 Kiểm tra vị trí trống trên LCD
 
-Truy cập http://[IP-ESP32] để quản lý bãi đỗ trên Web 💻
+💻 Truy cập http://[IP-ESP32] để quản lý bãi đỗ trên Web
 
 📜 Các hàm quan trọng
 
@@ -234,22 +244,23 @@ float measureDistance() {
    
     return distance;
 }
+
 🚦 Xác định xe và điều khiển LED
 
 void checkForVehicle() {
   
   int irState = digitalRead(IR_SENSOR_PIN); // Đọc trạng thái cảm biến hồng ngoại
-  
+ 
   distance = measureDistance();             // Đo khoảng cách
   
   // Hiển thị thông tin lên terminal
   
   Serial.print("IR State: ");
- 
+  
   Serial.println(irState == LOW ? "Có vật cản" : "Không có vật cản");
- 
+  
   Serial.print("Khoảng cách: ");
- 
+  
   Serial.print(distance);
  
   Serial.println(" cm");
@@ -259,15 +270,13 @@ void checkForVehicle() {
   if (irState == LOW && distance >= 400 && distance <= 1000) {
   
     digitalWrite(LED_PIN, HIGH); // Bật LED
- 
     Serial.println("Phát hiện xe trong khoảng 4m - 7m! LED sáng.");
  
   } else {
    
     digitalWrite(LED_PIN, LOW);  // Tắt LED
-   
     Serial.println("Không phát hiện xe hoặc ngoài khoảng 4m - 7m. LED tắt.");
-  
+ 
   }
 
 }
@@ -276,19 +285,15 @@ void checkForVehicle() {
 
 ESP32 cung cấp một giao diện Web để quản lý trạng thái bãi đỗ:
 
-Địa chỉ URL	Chức năng
+🚗 Trang chính: Hiển thị số lượng vị trí trống trong bãi xe với giao diện trực quan.
 
-/	Trang chính hiển thị trạng thái bãi xe
+📜 Lịch sử xe vào/ra: Xem log các phương tiện đã quét thẻ vào/ra bãi.
 
-/log	Xem lịch sử xe vào/ra
+🔓 Mở/đóng cổng: Nhấn nút trên giao diện để điều khiển servo.
 
-/open1	Mở cổng vào
+📶 Kết nối trạng thái: Hiển thị tín hiệu WiFi và thời gian thực.
 
-/close1	Đóng cổng vào
-
-/open2	Mở cổng ra
-
-/close2	Đóng cổng ra
+📊 Cập nhật dữ liệu: Dữ liệu cảm biến và trạng thái bãi xe được cập nhật liên tục
 
 📷 Hình ảnh thực tế
 
