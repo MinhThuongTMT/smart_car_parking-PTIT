@@ -17,15 +17,17 @@
 #define RST_PIN_1 2     // Chân RST cho RFID 1
 // RFID2
 #define SS_PIN_2 15     // Chân SS cho RFID 2 (Cổng ra) == SDA
-#define RST_PIN_2 13    // Chân RST cho RFID 2
+#define RST_PIN_2 0     // Chân RST cho RFID 2
 // SERVO
-#define SERVO_PIN_4 4   // Chân servo cổng 1
-#define SERVO_PIN_16 16 // Chân servo cổng 2
+#define SERVO_PIN_4 12   // Chân servo cổng 1
+#define SERVO_PIN_16 13  // Chân servo cổng 2
 // LOADCELL
-#define LOADCELL_DOUT_PIN 32  // Chân DATA của HX711 thứ nhất
-#define LOADCELL_SCK_PIN 33   // Chân SCK của HX711 thứ nhất
+#define LOADCELL_DOUT_PIN 32   // Chân DATA của HX711 thứ nhất
+#define LOADCELL_SCK_PIN 33    // Chân SCK của HX711 thứ nhất
 #define LOADCELL_DOUT_PIN_2 26 // Chân DATA của HX711 thứ hai
 #define LOADCELL_SCK_PIN_2 27  // Chân SCK của HX711 thứ hai
+#define LOADCELL_DOUT_PIN_3 4  // Chân DATA của HX711 thứ ba (D4 - GPIO4)
+#define LOADCELL_SCK_PIN_3 16  // Chân SCK của HX711 thứ ba (D16 - GPIO16)
 // Cảm biến vật cản hồng ngoại
 #define IR_SENSOR_PIN 35
 // Cảm biến khoảng cách Ultrasonic
@@ -37,7 +39,9 @@
 // Khai báo đối tượng
 HX711 scale;       // Cảm biến trọng lượng 1
 HX711 scale2;      // Cảm biến trọng lượng 2
+HX711 scale3;      // Cảm biến trọng lượng 3
 float calibration_factor = 417.5; // Hệ số hiệu chuẩn
+float calibration_factor3 = -417.5; // Hệ số hiệu chuẩn
 
 // Khai báo biến NTP
 WiFiUDP ntpUDP;
@@ -58,6 +62,7 @@ String logData = "";
 int availableSpots = 4;  // Số vị trí còn trống ban đầu
 bool wasOccupied1 = false; // Trạng thái trước đó của cảm biến 1
 bool wasOccupied2 = false; // Trạng thái trước đó của cảm biến 2
+bool wasOccupied3 = false; // Trạng thái trước đó của cảm biến 3
 
 // Biến để lưu khoảng cách
 float distance;
@@ -141,7 +146,15 @@ void setup() {
     delay(1000);
     scale2.set_scale(calibration_factor);
     Serial.println("Hiệu chuẩn cảm biến thứ hai hoàn tất!");
-    Serial.println("Cả hai cân đã sẵn sàng để đo!");
+
+    // Khởi tạo cảm biến trọng lượng 3
+    scale3.begin(LOADCELL_DOUT_PIN_3, LOADCELL_SCK_PIN_3);
+    Serial.println("Đang hiệu chuẩn cân thứ ba...");
+    scale3.tare();
+    delay(1000);
+    scale3.set_scale(calibration_factor3);
+    Serial.println("Hiệu chuẩn cảm biến thứ ba hoàn tất!");
+    Serial.println("Tất cả các cân đã sẵn sàng để đo!");
 
     // Cấu hình các chân cảm biến và LED
     pinMode(IR_SENSOR_PIN, INPUT);  // Cảm biến hồng ngoại
@@ -233,7 +246,7 @@ void checkWeightSensors() {
         Serial.print(weight1);
         Serial.println(" g");
 
-        bool isOccupied1 = weight1 > 10;
+        bool isOccupied1 = weight1 > 3;
         if (isOccupied1 && !wasOccupied1) {
             if (availableSpots > 0) {
                 availableSpots--;
@@ -259,7 +272,7 @@ void checkWeightSensors() {
         Serial.print(weight2);
         Serial.println(" g");
 
-        bool isOccupied2 = weight2 > 8;
+        bool isOccupied2 = weight2 > 20;
         if (isOccupied2 && !wasOccupied2) {
             if (availableSpots > 0) {
                 availableSpots--;
@@ -274,6 +287,32 @@ void checkWeightSensors() {
         wasOccupied2 = isOccupied2;
     } else {
         Serial.println("Cảm biến 2 chưa sẵn sàng!");
+    }
+
+    // Cảm biến 3
+    if (scale3.is_ready()) {
+        float weight3 = scale3.get_units(10);
+        if (abs(weight3) < 2) weight3 = 0;
+
+        Serial.print("Khối lượng cảm biến 3: ");
+        Serial.print(weight3);
+        Serial.println(" g");
+
+        bool isOccupied3 = weight3 > 10; 
+        if (isOccupied3 && !wasOccupied3) {
+            if (availableSpots > 0) {
+                availableSpots--;
+                updateLCD();
+            }
+        } else if (!isOccupied3 && wasOccupied3) {
+            if (availableSpots < 4) {
+                availableSpots++;
+                updateLCD();
+            }
+        }
+        wasOccupied3 = isOccupied3;
+    } else {
+        Serial.println("Cảm biến 3 chưa sẵn sàng!");
     }
 }
 
@@ -290,26 +329,47 @@ float measureDistance() {
     return distance;
 }
 
+// Biến toàn cục để theo dõi thời gian và trạng thái LED
+unsigned long ledTurnOnTime = 0; // Thời điểm bật LED
+bool ledIsOn = false;            // Trạng thái LED
+
 // Hàm kiểm tra xe và điều khiển LED
 void checkForVehicle() {
-  int irState = digitalRead(IR_SENSOR_PIN); // Đọc trạng thái cảm biến hồng ngoại
-  distance = measureDistance();             // Đo khoảng cách
-  
-  // Hiển thị thông tin lên terminal
-  Serial.print("IR State: ");
-  Serial.println(irState == LOW ? "Có vật cản" : "Không có vật cản");
-  Serial.print("Khoảng cách: ");
-  Serial.print(distance);
-  Serial.println(" cm");
-  
-  // Kiểm tra điều kiện: Có vật cản và khoảng cách từ 4m đến 10m
-  if (irState == LOW && distance >= 400 && distance <= 1000) {
-    digitalWrite(LED_PIN, HIGH); // Bật LED
-    Serial.println("Phát hiện xe trong khoảng 4m - 7m! LED sáng.");
-  } else {
-    digitalWrite(LED_PIN, LOW);  // Tắt LED
-    Serial.println("Không phát hiện xe hoặc ngoài khoảng 4m - 7m. LED tắt.");
-  }
+    int irState = digitalRead(IR_SENSOR_PIN); // Đọc trạng thái cảm biến hồng ngoại
+    distance = measureDistance();             // Đo khoảng cách từ cảm biến siêu âm
+    
+    // Kiểm tra điều kiện: Có vật cản và khoảng cách từ 4m đến 10m (400cm đến 1000cm)
+    bool isVehicleDetected = (irState == LOW && distance >= 400 && distance <= 1000);
+    
+    // Kiểm tra cả ba cảm biến trọng lượng
+    bool allScalesOccupied = wasOccupied1 && wasOccupied2 && wasOccupied3;
+    
+    // Nếu phát hiện xe và cả ba cảm biến trọng lượng đều có vật, đồng thời LED chưa bật
+    if (isVehicleDetected && allScalesOccupied && !ledIsOn) {
+        digitalWrite(LED_PIN, HIGH); // Bật LED
+        ledIsOn = true;              // Cập nhật trạng thái LED
+        ledTurnOnTime = millis();    // Ghi lại thời điểm bật LED
+        Serial.println("Phát hiện xe và cả ba cảm biến trọng lượng có vật! LED sáng liên tục trong 7 giây.");
+        
+        // Giảm số chỗ trống nếu còn chỗ
+        if (availableSpots > 0) {
+            availableSpots--;
+            updateLCD(); // Cập nhật hiển thị số chỗ trống trên LCD
+        }
+    }
+    
+    // Nếu LED đang sáng và đã qua 7 giây
+    if (ledIsOn && (millis() - ledTurnOnTime >= 7000)) {
+        digitalWrite(LED_PIN, LOW); // Tắt LED
+        ledIsOn = false;            // Cập nhật trạng thái LED
+        Serial.println("LED tắt sau 7 giây.");
+        
+        // Khôi phục số chỗ trống vừa bị trừ
+        if (availableSpots < 4) { // Giả sử số chỗ trống tối đa là 4
+            availableSpots++;
+            updateLCD(); // Cập nhật lại hiển thị trên LCD
+        }
+    }
 }
 
 void handleRoot() {
