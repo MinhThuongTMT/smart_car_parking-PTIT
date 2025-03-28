@@ -11,6 +11,8 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include "HX711.h"
+#include <FS.h> // Chuyển ảnh vào hệ thống LITTLEFS
+#include <LITTLEFS.h>   // LittleFS cho ESP32
 
 // RFID1
 #define SS_PIN_1 5      // Chân SS cho RFID 1 (Cổng vào) == SDA
@@ -55,6 +57,13 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 Servo servo4;   // Servo cổng 1
 Servo servo16;  // Servo cổng 2
 
+String allowedUIDs[10]; // Danh sách UID của các thẻ đã quét tại cổng vào
+int allowedCount = 0;   // Số lượng thẻ hiện tại trong danh sách
+
+// Biến toàn cục để theo dõi thời gian và trạng thái LED
+unsigned long ledTurnOnTime = 0; // Thời điểm bật LED
+bool ledIsOn = false;            // Trạng thái LED
+
 WebServer server(80);
 String logData = "";
 
@@ -83,6 +92,7 @@ void updateLCD();
 void checkWeightSensors();
 float measureDistance();  // Hàm đo khoảng cách
 void checkForVehicle();   // Hàm kiểm tra xe và điều khiển LED
+void serveImage(String path, String contentType);
 
 void setup() {
     Serial.begin(115200);
@@ -90,6 +100,13 @@ void setup() {
     lcd.backlight();
     displayMessage("Starting...");
     delay(1000);
+
+    // Khởi tạo LITTLEFS
+    if (!LITTLEFS.begin(true)) {
+        Serial.println("Lỗi khi khởi tạo LITTLEFS");
+        return;
+    }
+    Serial.println("LITTLEFS khởi tạo thành công");
 
     // Kết nối WiFi
     WiFiManager wifiManager;
@@ -122,11 +139,24 @@ void setup() {
 
     // Cấu hình WebServer
     server.on("/", handleRoot);
+    // Phục vụ ảnh từ LITTLEFS
+    server.on("/background.jpg", HTTP_GET, []() {
+        serveImage("/background.jpg", "image/jpeg");
+    });
+    server.on("/logo.png", HTTP_GET, []() {
+        serveImage("/logo.png", "image/png");
+    });
+
     server.on("/log", handleLog);
+    
+    server.on("/availableSpots", handleAvailableSpots); 
+
     server.on("/open1", openGate1);
     server.on("/close1", closeGate1);
+    
     server.on("/open2", openGate2);
     server.on("/close2", closeGate2);
+    
     server.begin();
     Serial.println("WebServer Started.");
     displayMessage("System Ready");
@@ -194,23 +224,78 @@ void initializeSystem() {
     displayMessage("RFID Ready");
 }
 
+// Hàm để thêm UID vào danh sách
+void addUID(String uid) {
+    if (allowedCount < 10) {
+        allowedUIDs[allowedCount] = uid;
+        allowedCount++;
+    }
+}
+
+// Hàm để kiểm tra xem UID có trong danh sách hay không
+bool isUIDAllowed(String uid) {
+    for (int i = 0; i < allowedCount; i++) {
+        if (allowedUIDs[i] == uid) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Hàm để xóa UID khỏi danh sách
+void removeUID(String uid) {
+    for (int i = 0; i < allowedCount; i++) {
+        if (allowedUIDs[i] == uid) {
+            for (int j = i; j < allowedCount - 1; j++) {
+                allowedUIDs[j] = allowedUIDs[j + 1];
+            }
+            allowedCount--;
+            break;
+        }
+    }
+}
+
 void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action) {
     if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
-        Serial.println("RFID Detected at " + gateName);
+        String uid = "";
+        for (byte i = 0; i < rfid.uid.size; i++) {
+            uid += String(rfid.uid.uidByte[i], HEX);
+        }
+        uid.toUpperCase();
+        Serial.println("UID: " + uid);
+
         String entryTime = getTimeStamp();
 
-        // Cập nhật log
-        logData += "<tr><td>" + gateName + "</td><td>" + action + "</td><td>" + entryTime + "</td></tr>";
+        if (gateName == "Cổng vào") {
+            addUID(uid);
+            Serial.println("Thẻ được thêm vào danh sách tại Cổng vào");
 
-        // Mở cổng
-        displayMessage("-- OPEN --");
-        moveServo(servo, 90, 5000);
+            logData += "<tr><td>" + gateName + "</td><td>" + action + "</td><td>" + entryTime + "</td></tr>";
 
-        // Đóng cổng
-        moveServo(servo, 0, 0);
-        displayMessage("-- CLOSE --");
+            displayMessage("-- OPEN --");
+            moveServo(servo, 90, 5000);
+            moveServo(servo, 0, 0);
+            displayMessage("-- CLOSE --");
+        } 
+        else if (gateName == "Cổng ra") {
+            if (isUIDAllowed(uid)) {
+                removeUID(uid);
+                Serial.println("Thẻ hợp lệ, đã xóa khỏi danh sách");
 
-        // Dừng thẻ RFID
+                logData += "<tr><td>" + gateName + "</td><td>" + action + "</td><td>" + entryTime + "</td></tr>";
+
+                displayMessage("-- OPEN --");
+                moveServo(servo, 90, 5000);
+                moveServo(servo, 0, 0);
+                displayMessage("-- CLOSE --");
+            } else {
+                Serial.println("Thẻ không hợp lệ tại Cổng ra");
+                displayMessage("Thẻ không hợp lệ!");
+                delay(2000);
+                updateLCD();
+            }
+        }
+
         rfid.PICC_HaltA();
         rfid.PCD_StopCrypto1();
     }
@@ -298,7 +383,7 @@ void checkWeightSensors() {
         Serial.print(weight3);
         Serial.println(" g");
 
-        bool isOccupied3 = weight3 > 10; 
+        bool isOccupied3 = weight3 > 6; 
         if (isOccupied3 && !wasOccupied3) {
             if (availableSpots > 0) {
                 availableSpots--;
@@ -328,10 +413,6 @@ float measureDistance() {
     float distance = duration * 0.034 / 2; // Tính khoảng cách (cm)
     return distance;
 }
-
-// Biến toàn cục để theo dõi thời gian và trạng thái LED
-unsigned long ledTurnOnTime = 0; // Thời điểm bật LED
-bool ledIsOn = false;            // Trạng thái LED
 
 // Hàm kiểm tra xe và điều khiển LED
 void checkForVehicle() {
@@ -372,120 +453,285 @@ void checkForVehicle() {
     }
 }
 
+void handleAvailableSpots() {
+    server.send(200, "text/plain", String(availableSpots));
+}
+
+void serveImage(const char *path, const char *contentType) {
+    File file = LITTLEFS.open(path, "r", false); // Cập nhật cú pháp
+    if (!file) {
+        server.send(404, "text/plain", "File Not Found");
+        return;
+    }
+    server.streamFile(file, contentType);
+    file.close();
+}
+
 void handleRoot() {
     String html = R"rawliteral(
     <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>SMART PARKING</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                background-color: #f4f4f4;
-                text-align: center;
-                margin: 0;
-                padding: 20px;
-            }
-            .container {
-                max-width: 900px;
-                background: white;
-                padding: 30px;
-                border-radius: 10px;
-                box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.2);
-                margin: auto;
-            }
-            h2 {
-                font-size: 28px;
-                color: #333;
-            }
-            .button {
-                display: inline-block;
-                width: 160px;
-                padding: 15px;
-                margin: 15px;
-                font-size: 18px;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                cursor: pointer;
-            }
-            .open {
-                background: #28a745; /* Xanh lá */
-            }
-            .open:hover {
-                background: #218838;
-            }
-            .close {
-                background: #dc3545; /* Đỏ */
-            }
-            .close:hover {
-                background: #c82333;
-            }
-            table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 20px;
-                font-size: 18px;
-            }
-            th, td {
-                padding: 12px;
-                border: 1px solid #ddd;
-                text-align: center;
-            }
-            th {
-                background: #007BFF;
-                color: white;
-                font-size: 20px;
-            }
-            .log-container {
-                height: 300px;
-                overflow-y: auto;
-                border: 1px solid #ddd;
-                padding: 10px;
-                border-radius: 5px;
-                background: #fff;
-            }
-        </style>
-        <script>
-            function sendRequest(endpoint) {
-                fetch(endpoint).then(response => response.text()).then(data => {
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NHOM 1 - PTIT</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+
+
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-image: url("https://res.cloudinary.com/dkqutpweh/image/upload/v1743181539/background_kckgfq.jpg");
+            background-size: cover;
+            background-position: center;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 900px;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.2);
+            margin: auto;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .logo img {
+            height: 50px;
+        }
+        .notification {
+            font-size: 24px;
+            color: #007BFF;
+            cursor: pointer;
+        }
+        h2 {
+            margin: 0;
+            font-size: 35px;
+            color: hsl(213, 100%, 50%);
+        }
+        .spots-box {
+            background-color: #2758b8;
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-size: 25px;
+            font-weight: bold;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        .switch-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px 5;
+        }
+        .switch-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 20px 0;
+        }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+            margin: 0 10px;
+        }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #003661;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .gate-label {
+            font-size: 20px;
+            color: hsl(0, 0%, 0%);
+            margin: 0 10px;
+            font-weight: bold;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 18px;
+        }
+        th, td {
+            padding: 12px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        th {
+            background: #007BFF;
+            color: white;
+            font-size: 20px;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        .log-container {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            border-radius: 5px;
+            background: #fff;
+        }
+        .error-message {
+            color: red;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+    </style>
+    <script>
+        function toggleGate(gateNumber, isOpen) {
+            const endpoint = isOpen ? `/open${gateNumber}` : `/close${gateNumber}`;
+            fetch(endpoint)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(data => {
                     console.log(data);
                     updateLog();
+                    updateAvailableSpots();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('errorMessage').innerText = 'Có lỗi xảy ra khi điều khiển cổng. Vui lòng thử lại sau.';
                 });
-            }
-            function updateLog() {
-                fetch('/log').then(response => response.text()).then(data => {
+        }
+        function updateLog() {
+            fetch('/log')
+                .then(response => response.text())
+                .then(data => {
                     document.getElementById("logTable").innerHTML = data;
+                })
+                .catch(error => {
+                    console.error('Error fetching log:', error);
                 });
-            }
-            setInterval(updateLog, 5000);
-        </script>
-    </head>
-    <body>
-        <div class="container">
-            <h2>SMART PARKING PTIT</h2>
-            <button class="button open" onclick="sendRequest('/open1')">MỞ CỔNG 1</button>
-            <button class="button close" onclick="sendRequest('/close1')">ĐÓNG CỔNG 1</button><br>
-            <button class="button open" onclick="sendRequest('/open2')">MỞ CỔNG 2</button>
-            <button class="button close" onclick="sendRequest('/close2')">ĐÓNG CỔNG 2</button>
-            <h3>DANH SÁCH CÁC XE</h3>
-            <div class="log-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>CỔNG</th>
-                            <th>HÀNH ĐỘNG</th>
-                            <th>THỜI GIAN</th>
-                        </tr>
-                    </thead>
-                    <tbody id="logTable"></tbody>
-                </table>
+        }
+        function updateAvailableSpots() {
+            fetch('/availableSpots')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(data => {
+                    document.getElementById("availableSpots").innerText = data;
+                    document.getElementById('errorMessage').innerText = '';
+                })
+                .catch(error => {
+                    console.error('Error fetching available spots:', error);
+                    document.getElementById('availableSpots').innerText = 'N/A';
+                    document.getElementById('errorMessage').innerText = 'Không thể tải số vị trí còn trống. Vui lòng thử lại sau.';
+                });
+        }
+        setInterval(function() {
+            updateLog();
+            updateAvailableSpots();
+        }, 5000);
+        window.onload = function() {
+            updateAvailableSpots();
+        };
+        document.querySelector('.notification').addEventListener('click', function() {
+            fetch('/log')
+                .then(response => response.text())
+                .then(data => {
+                    alert('Danh sách sự kiện gần đây:\n' + data);
+                })
+                .catch(error => {
+                    console.error('Error fetching log:', error);
+                    alert('Không thể tải thông báo. Vui lòng thử lại sau.');
+                });
+        });
+    </script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <img src="https://res.cloudinary.com/dkqutpweh/image/upload/v1743181208/PTIT-01_wweubu.png" alt="Logo Trường">
+            </div>
+            <h2>SMART CAR PARKING</h2>
+            <div class="notification">
+                <i class="fa fa-bell"></i>
+            </div>
+        </header>
+        <div class="spots-box">
+            Số vị trí còn trống: <span id="availableSpots">Loading...</span>
+        </div>
+        <div class="switch-row">
+            <div class="switch-container">
+                <label class="gate-label">Cổng 1</label>
+                <label class="switch">
+                    <input type="checkbox" onchange="toggleGate(1, this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="switch-container">
+                <label class="gate-label">Cổng 2</label>
+                <label class="switch">
+                    <input type="checkbox" onchange="toggleGate(2, this.checked)">
+                    <span class="slider"></span>
+                </label>
             </div>
         </div>
-    </body>
-    </html>
+        <div id="errorMessage" class="error-message"></div>
+        <h3>DANH SÁCH CÁC XE</h3>
+        <div class="log-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>CỔNG</th>
+                        <th>HÀNH ĐỘNG</th>
+                        <th>THỜI GIAN</th>
+                    </tr>
+                </thead>
+                <tbody id="logTable"></tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
     )rawliteral";
 
     server.send(200, "text/html", html);
