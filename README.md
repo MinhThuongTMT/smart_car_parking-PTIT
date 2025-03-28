@@ -250,7 +250,8 @@ ESP32 cung cấp một giao diện Web để quản lý trạng thái bãi đỗ
 
 ### 📷 Hình ảnh thực tế
 
-(Thêm ảnh mô hình thật của bạn ở đây!)
+![image](https://github.com/user-attachments/assets/1cb388e5-ed3c-4c19-81ef-7091cb498b2b)
+
 
 ### 🏆 Kết quả & Đánh giá
 
