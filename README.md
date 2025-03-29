@@ -38,7 +38,8 @@
 
 ### 📜 Sơ đồ kết nối
 
-![image](https://github.com/user-attachments/assets/3d5326fd-7a27-4932-8000-4ee54b4db5c4)
+![image](https://github.com/user-attachments/assets/f2d93157-46ba-41f5-a450-92673835f067)
+
 
 ### 🚀 Cách sử dụng
 
