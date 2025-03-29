@@ -11,8 +11,6 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 #include "HX711.h"
-#include <FS.h> // Chuyển ảnh vào hệ thống LITTLEFS
-#include <LITTLEFS.h>   // LittleFS cho ESP32
 
 // RFID1
 #define SS_PIN_1 5      // Chân SS cho RFID 1 (Cổng vào) == SDA
@@ -92,7 +90,6 @@ void updateLCD();
 void checkWeightSensors();
 float measureDistance();  // Hàm đo khoảng cách
 void checkForVehicle();   // Hàm kiểm tra xe và điều khiển LED
-void serveImage(String path, String contentType);
 
 void setup() {
     Serial.begin(115200);
@@ -100,14 +97,6 @@ void setup() {
     lcd.backlight();
     displayMessage("Starting...");
     delay(1000);
-
-    // Khởi tạo LITTLEFS
-    if (!LITTLEFS.begin(true)) {
-        Serial.println("Lỗi khi khởi tạo LITTLEFS");
-        return;
-    }
-    Serial.println("LITTLEFS khởi tạo thành công");
-
     // Kết nối WiFi
     WiFiManager wifiManager;
     displayMessage("Connecting WiFi...");
@@ -139,14 +128,7 @@ void setup() {
 
     // Cấu hình WebServer
     server.on("/", handleRoot);
-    // Phục vụ ảnh từ LITTLEFS
-    server.on("/background.jpg", HTTP_GET, []() {
-        serveImage("/background.jpg", "image/jpeg");
-    });
-    server.on("/logo.png", HTTP_GET, []() {
-        serveImage("/logo.png", "image/png");
-    });
-
+    
     server.on("/log", handleLog);
     
     server.on("/availableSpots", handleAvailableSpots); 
@@ -289,8 +271,8 @@ void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action) {
                 moveServo(servo, 0, 0);
                 displayMessage("-- CLOSE --");
             } else {
-                Serial.println("Thẻ không hợp lệ tại Cổng ra");
-                displayMessage("Thẻ không hợp lệ!");
+                Serial.println("!!!ERROR CARD!!!");
+                displayMessage("!!!ERROR CARD!!!");
                 delay(2000);
                 updateLCD();
             }
@@ -455,16 +437,6 @@ void checkForVehicle() {
 
 void handleAvailableSpots() {
     server.send(200, "text/plain", String(availableSpots));
-}
-
-void serveImage(const char *path, const char *contentType) {
-    File file = LITTLEFS.open(path, "r", false); // Cập nhật cú pháp
-    if (!file) {
-        server.send(404, "text/plain", "File Not Found");
-        return;
-    }
-    server.streamFile(file, contentType);
-    file.close();
 }
 
 void handleRoot() {
@@ -742,8 +714,7 @@ void handleLog() {
 }
 
 void openGate1() {
-    moveServo(servo4, 90, 5000);
-    moveServo(servo4, 0, 0);
+    moveServo(servo4, 90, 0);
     logData += "<tr><td>Cổng vào</td><td>Xe vào</td><td>" + getTimeStamp() + "</td></tr>";
     server.send(200, "text/plain", "Gate 1 Opened");
 }
@@ -755,8 +726,7 @@ void closeGate1() {
 }
 
 void openGate2() {
-    moveServo(servo16, 90, 5000);
-    moveServo(servo16, 0, 0);
+    moveServo(servo16, 90, 0);
     logData += "<tr><td>Cổng ra</td><td>Xe ra</td><td>" + getTimeStamp() + "</td></tr>";
     server.send(200, "text/plain", "Gate 2 Opened");
 }
