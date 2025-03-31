@@ -17,7 +17,7 @@
 #define RST_PIN_1 2     // Chân RST cho RFID 1
 // RFID2
 #define SS_PIN_2 15     // Chân SS cho RFID 2 (Cổng ra) == SDA
-#define RST_PIN_2 0     // Chân RST cho RFID 2
+#define RST_PIN_2 3     // Chân RST cho RFID 2
 // SERVO
 #define SERVO_PIN_4 12   // Chân servo cổng 1
 #define SERVO_PIN_16 13  // Chân servo cổng 2
@@ -254,9 +254,9 @@ void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action) {
 
             logData += "<tr><td>" + gateName + "</td><td>" + action + "</td><td>" + entryTime + "</td></tr>";
 
-            displayMessage("-- OPEN --");
-            moveServo(servo, 90, 5000);
-            moveServo(servo, 0, 0);
+            displayMessage("-- OPEN --"); // ngược chiều
+            moveServo(servo, 5, 5000); // mở lên 
+            moveServo(servo, 85, 0); // mở xuống
             displayMessage("-- CLOSE --");
         } 
         else if (gateName == "Cổng ra") {
@@ -266,9 +266,9 @@ void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action) {
 
                 logData += "<tr><td>" + gateName + "</td><td>" + action + "</td><td>" + entryTime + "</td></tr>";
 
-                displayMessage("-- OPEN --");
-                moveServo(servo, 90, 5000);
-                moveServo(servo, 0, 0);
+                displayMessage("-- OPEN --"); // cùng chiều 
+                moveServo(servo, 85, 5000); // mở lên 5 - 
+                moveServo(servo, 3, 0); //  xuống 85
                 displayMessage("-- CLOSE --");
             } else {
                 Serial.println("!!!ERROR CARD!!!");
@@ -313,7 +313,7 @@ void checkWeightSensors() {
         Serial.print(weight1);
         Serial.println(" g");
 
-        bool isOccupied1 = weight1 > 3;
+        bool isOccupied1 = weight1 > 5;
         if (isOccupied1 && !wasOccupied1) {
             if (availableSpots > 0) {
                 availableSpots--;
@@ -339,7 +339,7 @@ void checkWeightSensors() {
         Serial.print(weight2);
         Serial.println(" g");
 
-        bool isOccupied2 = weight2 > 20;
+        bool isOccupied2 = weight2 > 5;
         if (isOccupied2 && !wasOccupied2) {
             if (availableSpots > 0) {
                 availableSpots--;
@@ -673,14 +673,14 @@ void handleRoot() {
         </div>
         <div class="switch-row">
             <div class="switch-container">
-                <label class="gate-label">Cổng 1</label>
+                <label class="gate-label">Cổng vào</label>
                 <label class="switch">
                     <input type="checkbox" onchange="toggleGate(1, this.checked)">
                     <span class="slider"></span>
                 </label>
             </div>
             <div class="switch-container">
-                <label class="gate-label">Cổng 2</label>
+                <label class="gate-label">Cổng ra</label>
                 <label class="switch">
                     <input type="checkbox" onchange="toggleGate(2, this.checked)">
                     <span class="slider"></span>
@@ -714,7 +714,7 @@ void handleLog() {
 }
 
 void openGate1() {
-    moveServo(servo4, 90, 0);
+    moveServo(servo4, 70, 0);
     logData += "<tr><td>Cổng vào</td><td>Xe vào</td><td>" + getTimeStamp() + "</td></tr>";
     server.send(200, "text/plain", "Gate 1 Opened");
 }
@@ -726,13 +726,13 @@ void closeGate1() {
 }
 
 void openGate2() {
-    moveServo(servo16, 90, 0);
+    moveServo(servo16, 85, 0);
     logData += "<tr><td>Cổng ra</td><td>Xe ra</td><td>" + getTimeStamp() + "</td></tr>";
     server.send(200, "text/plain", "Gate 2 Opened");
 }
 
 void closeGate2() {
-    moveServo(servo16, 0, 0);
+    moveServo(servo16, 20, 0);
     logData += "<tr><td>Cổng ra</td><td>Đóng cổng</td><td>" + getTimeStamp() + "</td></tr>";
     server.send(200, "text/plain", "Gate 2 Closed");
 }
