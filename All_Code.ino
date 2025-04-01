@@ -422,7 +422,7 @@ void checkForVehicle() {
     }
     
     // Nếu LED đang sáng và đã qua 7 giây
-    if (ledIsOn && (millis() - ledTurnOnTime >= 7000)) {
+    if (ledIsOn && (millis() - ledTurnOnTime >= 1000)) {
         digitalWrite(LED_PIN, LOW); // Tắt LED
         ledIsOn = false;            // Cập nhật trạng thái LED
         Serial.println("LED tắt sau 7 giây.");
@@ -714,13 +714,13 @@ void handleLog() {
 }
 
 void openGate1() {
-    moveServo(servo4, 70, 0);
+    moveServo(servo4, 5, 0);
     logData += "<tr><td>Cổng vào</td><td>Xe vào</td><td>" + getTimeStamp() + "</td></tr>";
     server.send(200, "text/plain", "Gate 1 Opened");
 }
 
 void closeGate1() {
-    moveServo(servo4, 0, 0);
+    moveServo(servo4, 85, 0);
     logData += "<tr><td>Cổng vào</td><td>Đóng cổng</td><td>" + getTimeStamp() + "</td></tr>";
     server.send(200, "text/plain", "Gate 1 Closed");
 }
@@ -732,7 +732,7 @@ void openGate2() {
 }
 
 void closeGate2() {
-    moveServo(servo16, 20, 0);
+    moveServo(servo16, 3, 0);
     logData += "<tr><td>Cổng ra</td><td>Đóng cổng</td><td>" + getTimeStamp() + "</td></tr>";
     server.send(200, "text/plain", "Gate 2 Closed");
 }
