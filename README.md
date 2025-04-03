@@ -94,143 +94,177 @@ Mở Arduino IDE, vào Library Manager, tìm và cài đặt các thư viện sa
 ### 🎫 Xử lý RFID quét thẻ  
 
 ```cpp
-void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action) {  
-    if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {  
-        Serial.println("RFID Detected at " + gateName);  
-        
-        String entryTime = getTimeStamp();  
-        logData += "<tr><td>" + gateName + "</td><td>" + action + "</td><td>" + entryTime + "</td></tr>";  
+void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action) {
+    if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
+        String uid = "";
+        for (byte i = 0; i < rfid.uid.size; i++) {
+            uid += String(rfid.uid.uidByte[i], HEX);
+        }
+        uid.toUpperCase();
+        Serial.println("UID: " + uid);
 
-        displayMessage("-- OPEN --");  
-        moveServo(servo, 90, 5000);  
-        moveServo(servo, 0, 0);  
-        displayMessage("-- CLOSE --");  
+        String entryTime = getTimeStamp();
 
-        rfid.PICC_HaltA();  
-        rfid.PCD_StopCrypto1();  
-    }  
+        if (gateName == "Cổng vào") {
+            addUID(uid);
+            Serial.println("Thẻ được thêm vào danh sách tại Cổng vào");
+
+            logData += "<tr><td>" + gateName + "</td><td>" + action + "</td><td>" + entryTime + "</td></tr>";
+
+            displayMessage("-- OPEN --"); // ngược chiều
+            moveServo(servo, 5, 5000); // mở 
+            moveServo(servo, 85, 0); // đóng
+            displayMessage("-- CLOSE --");
+        } 
+        else if (gateName == "Cổng ra") {
+            if (isUIDAllowed(uid)) {
+                removeUID(uid);
+                Serial.println("Thẻ hợp lệ, đã xóa khỏi danh sách");
+
+                logData += "<tr><td>" + gateName + "</td><td>" + action + "</td><td>" + entryTime + "</td></tr>";
+
+                displayMessage("-- OPEN --"); // cùng chiều 
+                moveServo(servo, 85, 5000); // mở 85
+                moveServo(servo, 3, 0); //  đóng 3
+                displayMessage("-- CLOSE --");
+            } else {
+                Serial.println("!!!ERROR CARD!!!");
+                displayMessage("!!!ERROR CARD!!!");
+                delay(2000);
+                updateLCD();
+            }
+        }
+
+        rfid.PICC_HaltA();
+        rfid.PCD_StopCrypto1();
+    }
 }
 ```
 
 ### ⚖️ Kiểm tra cảm biến trọng lượng  
 
 ```cpp
-void checkWeightSensors() {  
-    // Cảm biến 1  
-    if (scale.is_ready()) {  
-        float weight1 = scale.get_units(10); // Trung bình 10 lần đo  
-        if (abs(weight1) < 2) weight1 = 0; // Ngưỡng nhiễu  
+void checkWeightSensors() {
+    // Cảm biến 1
+    if (scale.is_ready()) {
+        float weight1 = scale.get_units(10); // Trung bình 10 lần đo
+        if (abs(weight1) < 2) weight1 = 0; // Ngưỡng nhiễu
 
-        Serial.print("Khối lượng cảm biến 1: ");  
-        Serial.print(weight1);  
-        Serial.println(" g");  
+        Serial.print("Khối lượng cảm biến 1: ");
+        Serial.print(weight1);
+        Serial.println(" g");
 
-        bool isOccupied1 = weight1 > 10;  
-        if (isOccupied1 && !wasOccupied1) {  
-            if (availableSpots > 0) {  
-                availableSpots--;  
-                updateLCD();  
-            }  
-        } else if (!isOccupied1 && wasOccupied1) {  
-            if (availableSpots < 4) {  
-                availableSpots++;  
-                updateLCD();  
-            }  
-        }  
-        wasOccupied1 = isOccupied1;  
-    } else {  
-        Serial.println("Cảm biến 1 chưa sẵn sàng!");  
-    }  
+        bool isOccupied1 = weight1 > 5;
+        if (isOccupied1 && !wasOccupied1) {
+            if (availableSpots > 0) {
+                availableSpots--;
+                updateLCD();
+            }
+        } else if (!isOccupied1 && wasOccupied1) {
+            if (availableSpots < 4) {
+                availableSpots++;
+                updateLCD();
+            }
+        }
+        wasOccupied1 = isOccupied1;
+    } else {
+        Serial.println("Cảm biến 1 chưa sẵn sàng!");
+    }
 
-    // Cảm biến 2  
-    if (scale2.is_ready()) {  
-        float weight2 = scale2.get_units(10);  
-        if (abs(weight2) < 2) weight2 = 0;  
+    // Cảm biến 2
+    if (scale2.is_ready()) {
+        float weight2 = scale2.get_units(10);
+        if (abs(weight2) < 2) weight2 = 0;
 
-        Serial.print("Khối lượng cảm biến 2: ");  
-        Serial.print(weight2);  
-        Serial.println(" g");  
+        Serial.print("Khối lượng cảm biến 2: ");
+        Serial.print(weight2);
+        Serial.println(" g");
 
-        bool isOccupied2 = weight2 > 8;  
-        if (isOccupied2 && !wasOccupied2) {  
-            if (availableSpots > 0) {  
-                availableSpots--;  
-                updateLCD();  
-            }  
-        } else if (!isOccupied2 && wasOccupied2) {  
-            if (availableSpots < 4) {  
-                availableSpots++;  
-                updateLCD();  
-            }  
-        }  
-        wasOccupied2 = isOccupied2;  
-    } else {  
-        Serial.println("Cảm biến 2 chưa sẵn sàng!");  
-    }  
+        bool isOccupied2 = weight2 > 5;
+        if (isOccupied2 && !wasOccupied2) {
+            if (availableSpots > 0) {
+                availableSpots--;
+                updateLCD();
+            }
+        } else if (!isOccupied2 && wasOccupied2) {
+            if (availableSpots < 4) {
+                availableSpots++;
+                updateLCD();
+            }
+        }
+        wasOccupied2 = isOccupied2;
+    } else {
+        Serial.println("Cảm biến 2 chưa sẵn sàng!");
+    }
+
+    // Cảm biến 3
+    if (scale3.is_ready()) {
+        float weight3 = scale3.get_units(10);
+        if (abs(weight3) < 2) weight3 = 0;
+
+        Serial.print("Khối lượng cảm biến 3: ");
+        Serial.print(weight3);
+        Serial.println(" g");
+
+        bool isOccupied3 = weight3 > 6; 
+        if (isOccupied3 && !wasOccupied3) {
+            if (availableSpots > 0) {
+                availableSpots--;
+                updateLCD();
+            }
+        } else if (!isOccupied3 && wasOccupied3) {
+            if (availableSpots < 4) {
+                availableSpots++;
+                updateLCD();
+            }
+        }
+        wasOccupied3 = isOccupied3;
+    } else {
+        Serial.println("Cảm biến 3 chưa sẵn sàng!");
+    }
 }
 ```
-
-### 📏 Đo khoảng cách bằng cảm biến HC-SR04
-
-```cpp
-
-float measureDistance() {
-    
-    digitalWrite(TRIG_PIN, LOW);
-    
-    delayMicroseconds(2);
-   
-    digitalWrite(TRIG_PIN, HIGH);
-   
-    delayMicroseconds(10);
-   
-    digitalWrite(TRIG_PIN, LOW);
-    
-    long duration = pulseIn(ECHO_PIN, HIGH);
-   
-    float distance = duration * 0.034 / 2; // Tính khoảng cách (cm)
-   
-    return distance;
-}
-
-```
-
 ### 🚦 Xác định xe và điều khiển LED
 
 ```cpp
 
 void checkForVehicle() {
-  
-  int irState = digitalRead(IR_SENSOR_PIN); // Đọc trạng thái cảm biến hồng ngoại
- 
-  distance = measureDistance();             // Đo khoảng cách
-  
-  // Hiển thị thông tin lên terminal
-  
-  Serial.print("IR State: ");
-  
-  Serial.println(irState == LOW ? "Có vật cản" : "Không có vật cản");
-  
-  Serial.print("Khoảng cách: ");
-  
-  Serial.print(distance);
- 
-  Serial.println(" cm");
-  
-  // Kiểm tra điều kiện: Có vật cản và khoảng cách từ 4m đến 10m
-  
-  if (irState == LOW && distance >= 400 && distance <= 1000) {
-  
-    digitalWrite(LED_PIN, HIGH); // Bật LED
-    Serial.println("Phát hiện xe trong khoảng 4m - 7m! LED sáng.");
- 
-  } else {
-   
-    digitalWrite(LED_PIN, LOW);  // Tắt LED
-    Serial.println("Không phát hiện xe hoặc ngoài khoảng 4m - 7m. LED tắt.");
- 
-  }
-
+    int irState = digitalRead(IR_SENSOR_PIN); // Đọc trạng thái cảm biến hồng ngoại
+    distance = measureDistance();             // Đo khoảng cách từ cảm biến siêu âm
+    
+    // Kiểm tra điều kiện: Có vật cản và khoảng cách từ 4m đến 10m (400cm đến 1000cm)
+    bool isVehicleDetected = (irState == LOW && distance >= 400 && distance <= 1000);
+    
+    // Kiểm tra cả ba cảm biến trọng lượng
+    bool allScalesOccupied = wasOccupied1 && wasOccupied2 && wasOccupied3;
+    
+    // Nếu phát hiện xe và cả ba cảm biến trọng lượng đều có vật, đồng thời LED chưa bật
+    if (isVehicleDetected && allScalesOccupied && !ledIsOn) {
+        digitalWrite(LED_PIN, HIGH); // Bật LED
+        ledIsOn = true;              // Cập nhật trạng thái LED
+        Serial.println("Phát hiện xe và cả ba cảm biến trọng lượng có vật! LED sáng liên tục.");
+        
+        // Giảm số chỗ trống nếu còn chỗ
+        if (availableSpots > 0) {
+            availableSpots--;
+            updateLCD(); // Cập nhật hiển thị số chỗ trống trên LCD
+        }
+    }
+    
+    // Giả sử actualAvailableSpots là số chỗ trống thực tế được cập nhật từ logic khác
+    // Kiểm tra nếu số chỗ trống giảm (có xe rời bãi)
+    if (actualAvailableSpots < availableSpots) {    // Kiểm tra số chỗ trống hiện có
+        // Cập nhật số chỗ trống
+        availableSpots = actualAvailableSpots;
+        updateLCD(); // Cập nhật hiển thị trên LCD
+        
+        // Tắt LED nếu đang sáng
+        if (ledIsOn) {
+            digitalWrite(LED_PIN, LOW); // Tắt LED
+            ledIsOn = false;            // Cập nhật trạng thái LED
+            Serial.println("Số chỗ trống giảm, LED tắt.");
+        }
+    }
 }
 
 ```
