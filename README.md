@@ -229,39 +229,25 @@ void checkWeightSensors() {
 ```cpp
 
 void checkForVehicle() {
-    int irState = digitalRead(IR_SENSOR_PIN); // Đọc trạng thái cảm biến hồng ngoại
-    distance = measureDistance();             // Đo khoảng cách từ cảm biến siêu âm
-    
-    // Kiểm tra điều kiện: Có vật cản và khoảng cách từ 4m đến 10m (400cm đến 1000cm)
+    int irState = digitalRead(IR_SENSOR_PIN); 
+    distance = measureDistance();             
     bool isVehicleDetected = (irState == LOW && distance >= 400 && distance <= 1000);
-    
-    // Kiểm tra cả ba cảm biến trọng lượng
     bool allScalesOccupied = wasOccupied1 && wasOccupied2 && wasOccupied3;
-    
-    // Nếu phát hiện xe và cả ba cảm biến trọng lượng đều có vật, đồng thời LED chưa bật
     if (isVehicleDetected && allScalesOccupied && !ledIsOn) {
-        digitalWrite(LED_PIN, HIGH); // Bật LED
-        ledIsOn = true;              // Cập nhật trạng thái LED
+        digitalWrite(LED_PIN, HIGH); 
+        ledIsOn = true;             
         Serial.println("Phát hiện xe và cả ba cảm biến trọng lượng có vật! LED sáng liên tục.");
-        
-        // Giảm số chỗ trống nếu còn chỗ
         if (availableSpots > 0) {
             availableSpots--;
-            updateLCD(); // Cập nhật hiển thị số chỗ trống trên LCD
+            updateLCD(); 
         }
     }
-    
-    // Giả sử actualAvailableSpots là số chỗ trống thực tế được cập nhật từ logic khác
-    // Kiểm tra nếu số chỗ trống giảm (có xe rời bãi)
-    if (actualAvailableSpots < availableSpots) {    // Kiểm tra số chỗ trống hiện có
-        // Cập nhật số chỗ trống
+    if (actualAvailableSpots < availableSpots) {  
         availableSpots = actualAvailableSpots;
-        updateLCD(); // Cập nhật hiển thị trên LCD
-        
-        // Tắt LED nếu đang sáng
+        updateLCD(); 
         if (ledIsOn) {
-            digitalWrite(LED_PIN, LOW); // Tắt LED
-            ledIsOn = false;            // Cập nhật trạng thái LED
+            digitalWrite(LED_PIN, LOW); 
+            ledIsOn = false;            
             Serial.println("Số chỗ trống giảm, LED tắt.");
         }
     }
