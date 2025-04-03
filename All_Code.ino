@@ -66,7 +66,8 @@ WebServer server(80);
 String logData = "";
 
 // Biến theo dõi trạng thái
-int availableSpots = 4;  // Số vị trí còn trống ban đầu
+int availableSpots = 3;  // Số vị trí còn trống ban đầu
+int actualAvailableSpots = 3;  // Giả sử bãi có 4 chỗ trống ban đầu
 bool wasOccupied1 = false; // Trạng thái trước đó của cảm biến 1
 bool wasOccupied2 = false; // Trạng thái trước đó của cảm biến 2
 bool wasOccupied3 = false; // Trạng thái trước đó của cảm biến 3
@@ -98,15 +99,20 @@ void setup() {
     displayMessage("Starting...");
     delay(1000);
     // Kết nối WiFi
+    WiFi.mode(WIFI_STA);  // Chế độ Station Mode
     WiFiManager wifiManager;
+    wifiManager.setTimeout(30); // Giới hạn thời gian kết nối
+    wifiManager.resetSettings(); // Xóa WiFi cũ để thử lại
     displayMessage("Connecting WiFi...");
     Serial.println("Connecting to WiFi...");
-    if (!wifiManager.autoConnect("ESP32-TMT")) {
-        Serial.println("Failed to connect. Restarting...");
-        displayMessage("WiFi Failed!");
-        delay(2000);
-        ESP.restart();
+
+    if (!wifiManager.autoConnect("ESP32-TMT", "12345678")) {
+       Serial.println("Failed to connect. Restarting...");
+       displayMessage("WiFi Failed!");
+       delay(2000);
+       ESP.restart();
     }
+
     Serial.println("WiFi Connected");
     displayMessage("WiFi Connected!");
 
@@ -204,6 +210,10 @@ void initializeSystem() {
 
     Serial.println("RFID System Initialized.");
     displayMessage("RFID Ready");
+
+    // Đặt cả 2 servo về vị trí đóng khi khởi động
+    servo4.write(85);  // Đóng cổng vào
+    servo16.write(3);  // Đóng cổng ra
 }
 
 // Hàm để thêm UID vào danh sách
@@ -255,8 +265,8 @@ void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action) {
             logData += "<tr><td>" + gateName + "</td><td>" + action + "</td><td>" + entryTime + "</td></tr>";
 
             displayMessage("-- OPEN --"); // ngược chiều
-            moveServo(servo, 5, 5000); // mở lên 
-            moveServo(servo, 85, 0); // mở xuống
+            moveServo(servo, 5, 5000); // mở 
+            moveServo(servo, 85, 0); // đóng
             displayMessage("-- CLOSE --");
         } 
         else if (gateName == "Cổng ra") {
@@ -267,8 +277,8 @@ void handleRFID(MFRC522 &rfid, Servo &servo, String gateName, String action) {
                 logData += "<tr><td>" + gateName + "</td><td>" + action + "</td><td>" + entryTime + "</td></tr>";
 
                 displayMessage("-- OPEN --"); // cùng chiều 
-                moveServo(servo, 85, 5000); // mở lên 5 - 
-                moveServo(servo, 3, 0); //  xuống 85
+                moveServo(servo, 85, 5000); // mở 85
+                moveServo(servo, 3, 0); //  đóng 3
                 displayMessage("-- CLOSE --");
             } else {
                 Serial.println("!!!ERROR CARD!!!");
@@ -405,14 +415,13 @@ void checkForVehicle() {
     bool isVehicleDetected = (irState == LOW && distance >= 400 && distance <= 1000);
     
     // Kiểm tra cả ba cảm biến trọng lượng
-    bool allScalesOccupied = wasOccupied1 && wasOccupied2 && wasOccupied3;
+    bool allScalesOccupied = wasOccupied1 && wasOccupied3;
     
-    // Nếu phát hiện xe và cả ba cảm biến trọng lượng đều có vật, đồng thời LED chưa bật
+    // Trường hợp phát hiện xe và cần bật LED
     if (isVehicleDetected && allScalesOccupied && !ledIsOn) {
         digitalWrite(LED_PIN, HIGH); // Bật LED
         ledIsOn = true;              // Cập nhật trạng thái LED
-        ledTurnOnTime = millis();    // Ghi lại thời điểm bật LED
-        Serial.println("Phát hiện xe và cả ba cảm biến trọng lượng có vật! LED sáng liên tục trong 7 giây.");
+        Serial.println("Phát hiện xe và cả ba cảm biến trọng lượng có vật! LED sáng liên tục.");
         
         // Giảm số chỗ trống nếu còn chỗ
         if (availableSpots > 0) {
@@ -421,20 +430,23 @@ void checkForVehicle() {
         }
     }
     
-    // Nếu LED đang sáng và đã qua 7 giây
-    if (ledIsOn && (millis() - ledTurnOnTime >= 1000)) {
-        digitalWrite(LED_PIN, LOW); // Tắt LED
-        ledIsOn = false;            // Cập nhật trạng thái LED
-        Serial.println("LED tắt sau 7 giây.");
-        
-        // Khôi phục số chỗ trống vừa bị trừ
-        if (availableSpots < 4) { // Giả sử số chỗ trống tối đa là 4
-            availableSpots++;
-            updateLCD(); // Cập nhật lại hiển thị trên LCD
+    // Lưu giá trị trước đó của số chỗ trống
+    static int previousSpots = availableSpots;
+    
+    // Kiểm tra nếu số chỗ trống tăng lên (có xe rời bãi)
+    if (availableSpots > previousSpots) {    
+        // Tắt LED nếu đang sáng
+        if (ledIsOn) {
+            digitalWrite(LED_PIN, LOW); // Tắt LED
+            ledIsOn = false;            // Cập nhật trạng thái LED
+            Serial.println("Số chỗ trống tăng, LED tắt.");
         }
+        updateLCD(); // Cập nhật hiển thị trên LCD
     }
+    
+    // Cập nhật giá trị previousSpots cho lần kiểm tra tiếp theo
+    previousSpots = availableSpots;
 }
-
 void handleAvailableSpots() {
     server.send(200, "text/plain", String(availableSpots));
 }
